@@ -505,39 +505,33 @@ elif page == "🔍 订单成本诊断":
         total_act = order.actual_cost.total_cost
         total_var = total_act - total_std
         expected_profit = unit_ana.get("expected_profit")
-        current_standard_row = (
-            f"<div>{comparison_label}：<strong>{format_money(total_std)}</strong></div>"
-            if order.completion_rate < 1 else ""
-        )
-        st.markdown(f"""
-        <div style="padding:16px;border-radius:10px;background:linear-gradient(135deg,#f0f5ff,#e6f7ff);">
-            <h4 style="margin:0 0 12px 0;">📊 订单成本汇总</h4>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:14px;">
-                <div>整单标准成本：<strong>{format_money(full_standard)}</strong></div>
-                {current_standard_row}
-                <div>累计实际成本：<strong>{format_money(total_act)}</strong></div>
-                <div>同期成本差异：<strong style="color:{'#f5222d' if total_var>0 else '#52c41a'}">{format_money(total_var)}</strong></div>
-                <div>标准利润：<strong>{format_money(order.standard_profit)}</strong></div>
-                <div>预计利润：<strong>{format_money(expected_profit)}</strong></div>
-                <div>正式实际利润：<strong>{format_money(order.actual_profit)}</strong></div>
-                <div>标准毛利率：<strong>{format_pct(unit_ana['gross_margin_rate_standard'])}</strong></div>
-                <div>预计毛利率：<strong>{format_pct(unit_ana['expected_margin_rate'])}</strong></div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+
+        st.subheader("📊 订单成本汇总")
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.metric("整单标准成本", format_money(full_standard))
+            if order.completion_rate < 1:
+                st.metric(comparison_label, format_money(total_std))
+            st.metric("累计实际成本", format_money(total_act))
+            st.metric("标准利润", format_money(order.standard_profit))
+        with col_b:
+            st.metric("同期成本差异", format_money(total_var),
+                       delta=f"{'超支' if total_var > 0 else '节约'}",
+                       delta_color="inverse" if total_var > 0 else "normal")
+            st.metric("预计利润", format_money(expected_profit))
+            st.metric("正式实际利润", format_money(order.actual_profit))
+            st.metric("标准毛利率", format_pct(unit_ana['gross_margin_rate_standard']))
+            st.metric("预计毛利率", format_pct(unit_ana['expected_margin_rate']))
 
         if 0 < order.completion_rate < 1.0 and order.actual_cost.total_cost > 0:
             proj = cost_engine.project_final_cost(order.actual_cost, order.completion_rate)
             proj_profit = order.sales_amount - proj.total_cost
-            st.markdown(f"""
-            <div style="margin-top:10px;padding:16px;border-radius:10px;background:linear-gradient(135deg,#fff7e6,#fff1b8);border:1px solid #ffd591;">
-                <h5 style="margin:0 0 8px 0;">🔮 按当前完工率 ({order.completion_rate*100:.1f}%) 推算最终成本</h5>
-                <div style="font-size:14px;">
-                     预计总成本：<strong>{format_money(proj.total_cost)}</strong>（较整单标准 {format_pct((proj.total_cost-full_standard)/full_standard*100 if full_standard else 0)}）<br>
-                    预计最终利润：<strong style="color:{'#f5222d' if proj_profit<0 else '#52c41a'}">{format_money(proj_profit)}</strong>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            proj_var_pct = format_pct((proj.total_cost - full_standard) / full_standard * 100 if full_standard else 0)
+            st.info(
+                f"🔮 **按当前完工率 ({order.completion_rate*100:.1f}%) 推算最终成本**\n\n"
+                f"- 预计总成本：**{format_money(proj.total_cost)}**（较整单标准 {proj_var_pct}）\n"
+                f"- 预计最终利润：**{format_money(proj_profit)}**"
+            )
 
     st.markdown("---")
     st.subheader("📉 明细差异分析与规则诊断")
